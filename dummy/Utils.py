@@ -3,11 +3,11 @@ import json
 import os
 
 
-def auto_save_and_load(force_update=False):
+def auto_save_and_load(auto_update=True):
     def decorator(updater):
         def wrapper(*args, **kw):
             filename = kw['filename']
-            if not force_update and os.path.exists(filename):
+            if auto_update and os.path.exists(filename):
                 with open(filename, 'rb') as fd:
                     fd.readline()
                     obj = json.load(fd, encoding='utf-8')
