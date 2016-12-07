@@ -15,7 +15,7 @@ def auto_save_and_load(auto_update=True):
                 obj = updater(*args, **kw)
                 with open(filename, 'wb') as fd:
                     fd.write('# -*- coding: utf-8 -*-\n')
-                    json.dump(obj, fd, ensure_ascii=False)
+                    json.dump(obj, fd, ensure_ascii=False, indent=4)
             return obj
 
         return wrapper
