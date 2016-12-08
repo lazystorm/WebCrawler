@@ -4,11 +4,17 @@ import re
 import gevent
 import os
 import Utils
-from gevent import socket
-from gevent import monkey; monkey.patch_all()
+from ignore import ignore_dir
+from check import check_images
+from gevent import monkey
+
+
+monkey.patch_all()
+os.chdir('../images')
 
 threads = []
-
+user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36'
+headers = {'user-agent': user_agent}
 """<p><a target="_blank" href="http://admin.3dmgame.com/uploads/allimg/161205/153_161205155056_2.jpg
 " style="text-indent: 24px;"><img src="http://admin.3dmgame.com/uploads/allimg/161205/153_161205155056_2_lit.jpg
 " border="0" alt="" /></a></p>
@@ -16,12 +22,15 @@ threads = []
 <img src="http://www.3dmgame.com/uploads/allimg/160603/153_160603161305_2_lit.jpg" border="0" alt="" /></a></p>
 <p>比较词穷的一个广告标语</p>"""
 pic_url_pattern = re.compile(
-            r'src="(http://[a-z]+\.3dmgame\.com/uploads/allimg/.*?)"[\s border="0" alt="" /></a></p><p>]+(.*?)</p>',
+            r'<img[\s border="0" alt="" ]+src="(http://[a-z]+\.3dmgame\.com/uploads/allimg/.*?)"[\s border="0" alt="" /></a></p><p>]+(.*?)</p>',
             flags=re.M)
 
 join_pic_page_url_pattern = re.compile(r'<a href="http://www\.3dmgame\.com/zt/[0-9]+/[0-9]+\.html" target="_blank">.*?</a>')
 """<a  href='3612893_44.html'>末页</a> -> 44"""
 page_end_pattern = re.compile(r"<a  href='[0-9]+_[0-9]+.html'>末页</a>")
+
+ignored_dirs = ignore_dir(filename='ignored_dirs.py')
+
 
 class Spider3dm:
     def __init__(self, url):
@@ -43,7 +52,7 @@ class Spider3dm:
             strs.append(url[1])
         return imgs, strs
 
-    @Utils.auto_save_and_load(False)
+    @Utils.auto_save_and_load()
     def get_all_url_str(self, filename):
         if self.main_page is None:
             self.main_page = requests.get(self.main_url)
@@ -65,6 +74,8 @@ class Spider3dm:
         murl = self.main_url
         self.dirname = murl[murl.rfind('/') + 1:-5]
         print self.dirname
+        if self.dirname in ignored_dirs:
+            return
         if not os.path.exists(self.dirname):
             os.makedirs(self.dirname)
         filename = self.dirname + '/' + self.dirname + '.py'
@@ -73,11 +84,12 @@ class Spider3dm:
         self.imgs = data['imgs']   
         for url in self.imgs:
             filename = self.dirname + '/' + url[url.rfind(r'/') + 1:]
-            if not os.path.exists(filename):     
-                threads.append(gevent.spawn(self.download_image, url, filename))
+            if not os.path.exists(filename):
+                threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
                 gevent.sleep(1)
 
-    def download_image(self, url, filename):
+    @staticmethod
+    def download_image(url, filename):
         r = requests.get(url)
         Spider3dm.write_file(filename, r.content)
 
@@ -102,7 +114,8 @@ def get_join_pic_urls(main_url, filename):
                 join_pic_urls.append(pic_url)
     return join_pic_urls
 
-def joinner(tick_count):
+
+def joiner(tick_count):
     global threads
     idle_cnt = 0
     while True:
@@ -123,13 +136,23 @@ def joinner(tick_count):
             gevent.sleep(tick_count)
 
 
+def download_missing_imgs():
+    missing_imgs = check_images(filename='missing_imgs.py')
+    for fdir, url in missing_imgs:
+        filename = os.path.join(fdir, url[url.rfind(r'/') + 1:])
+        if not os.path.exists(fdir):
+            os.mkdir(fdir)
+        if not os.path.exists(filename):
+            threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
+
+
 def main():
     root_url = 'http://www.3dmgame.com/zt/'
-    os.chdir('../images')
     print os.getcwd()
     urls = get_join_pic_urls(root_url, filename='join_pic_urls.py')
     r = []
-    j = [gevent.spawn(joinner, 10)]
+    j = [gevent.spawn(joiner, 10)]
+    download_missing_imgs()
     for url in urls:
         r.append(Spider3dm(url))
         r[-1].download()
