@@ -7,12 +7,14 @@ import Utils
 from ignore import ignore_dir
 from check import check_images
 from gevent import monkey
-
+from gevent.pool import Pool
 
 monkey.patch_all()
 os.chdir('../images')
 
 threads = []
+download_pool = Pool(80)
+
 user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36'
 headers = {'user-agent': user_agent}
 """<p><a target="_blank" href="http://admin.3dmgame.com/uploads/allimg/161205/153_161205155056_2.jpg
@@ -20,9 +22,10 @@ headers = {'user-agent': user_agent}
 " border="0" alt="" /></a></p>
 <p>咖啡师初学者</p>
 <img src="http://www.3dmgame.com/uploads/allimg/160603/153_160603161305_2_lit.jpg" border="0" alt="" /></a></p>
-<p>比较词穷的一个广告标语</p>"""
+<p>比较词穷的一个广告标语</p>
+<IMG alt="" src="http://www.3dmgame.com/Article/UploadFiles/201205/20120525103609569.jpg" border=undefined></A><BR>一老大爷在上海地铁10号线上淡定自若地杀鸡!!</P>"""
 pic_url_pattern = re.compile(
-            r'<img[\s border="0" alt="" ]+src="(http://[a-z]+\.3dmgame\.com/uploads/allimg/.*?)"[\s border="0" alt="" /></a></p><p>]+(.*?)</p>',
+            r'<[imgIMG]+[\s border="0undefined" alt="" ]+src="((?:http://[a-z]+\.3dmgame\.com)?/[Articleuploads]+/[allimgUploadFiles]+/\d+/[_\dlit]+\.[jpgif]+?)"[\s border="0" ABRundefinedalt="" /></a></p><p>]+(.*?)</[pP]?>',
             flags=re.M)
 
 join_pic_page_url_pattern = re.compile(r'<a href="http://www\.3dmgame\.com/zt/[0-9]+/[0-9]+\.html" target="_blank">.*?</a>')
@@ -48,7 +51,10 @@ class Spider3dm:
         imgs = []
         strs = []
         for url in urls:
-            imgs.append(url[0].replace('_lit.', '.'))
+            img = url[0]
+            if url[0][0] =='/':
+                img = 'http://www.3dmgame.com' + url[0]
+            imgs.append(img.replace('_lit.', '.'))
             strs.append(url[1])
         return imgs, strs
 
@@ -85,18 +91,25 @@ class Spider3dm:
         for url in self.imgs:
             filename = self.dirname + '/' + url[url.rfind(r'/') + 1:]
             if not os.path.exists(filename):
-                threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
-                gevent.sleep(1)
+                #threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
+                while True:
+                    if download_pool.full():
+                        gevent.sleep(1)
+                    else:
+                        download_pool.spawn(Spider3dm.download_image, url, filename)
+                        break
+                #gevent.sleep(1)
 
     @staticmethod
     def download_image(url, filename):
-        r = requests.get(url)
-        Spider3dm.write_file(filename, r.content)
+        image = requests.get(url).content
+        Spider3dm.write_file(filename, image)
 
     @staticmethod
     def write_file(filename, content):
         with open(filename, 'wb') as fd:
             fd.write(content)
+        print 'finish download: %s' % filename
 
 
 @Utils.auto_save_and_load()
@@ -137,72 +150,63 @@ def joiner(tick_count):
 
 
 def download_missing_imgs():
+    global threads
     missing_imgs = check_images(filename='missing_imgs.py')
     for fdir, url in missing_imgs:
-        filename = os.path.join(fdir, url[url.rfind(r'/') + 1:])
         if not os.path.exists(fdir):
             os.mkdir(fdir)
-        if not os.path.exists(filename):
+        os.chdir(fdir)
+        if url:
+            filename = url[url.rfind(r'/') + 1:]
+            Spider3dm.download_image(url, filename)
+        os.chdir('..')
+        """
+        if len(threads) < 40:
             threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
-
+        else:
+            gevent.joinall(threads, timeout=100)
+            tthrs = []
+            for thr in threads:
+                if not thr.successful():
+                    tthrs.append(thr)
+            threads = tthrs
+            print 'no of downloading threads %d' % len(threads)"""
 
 def main():
-    root_url = 'http://www.3dmgame.com/zt/'
-    print os.getcwd()
-    urls = get_join_pic_urls(root_url, filename='join_pic_urls.py')
-    r = []
-    j = [gevent.spawn(joiner, 10)]
-    download_missing_imgs()
-    for url in urls:
-        r.append(Spider3dm(url))
-        r[-1].download()
-    gevent.joinall(j)
+    fix = False
+    if fix:
+        download_missing_imgs()
+    else:
+        root_url = 'http://www.3dmgame.com/zt/'
+        print os.getcwd()
+        urls = get_join_pic_urls(root_url, filename='join_pic_urls.py')
+        r = []
+        #j = [gevent.spawn(joiner, 10)]
+        urls.reverse()
+        for url in urls:
+            r.append(Spider3dm(url))
+            r[-1].download()
+        #gevent.joinall(j)
 
 
 if __name__ == '__main__':
     t = False
     if t:
-        sss = """<a  href='3612345_2.html'>下页</a> 
-<a  href='3612345_44.html'>末页</a> 
-</div>
-</div><div class="lgxZ con"><div class="miaoshu">周五依然有小编带来的雷人内涵搞笑图集，男生最喜欢和这样的妹子出去喝酒，不要问为什么。</div>
-<div>
-<p>周<a class='simzt' href='http://www.3dmgame.com/games/fivegod/' target='_blank'>五</a>依然有小编带来的雷人内涵搞笑图集，男生最喜欢和这样的妹子出去喝酒，不要问为什么。</p>
-
-<p><a target="_blank" href="/uploads/allimg/161202/153_161202161325_1.jpg"><img onerror="this.src=this.src.replace(/img([\d]+)\.3dmgame\.com/,'www\.3dmgame\.com');this.onerror=null" src="http://img02.3dmgame.com/uploads/allimg/161202/153_161202161325_1_lit.jpg" border="0" alt="" /></a></p>
-<p>男生最喜欢和这样的妹子出去喝酒</p>
-
-<p><a target="_blank" href="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_2.gif" style="text-indent: 24px;"><img src="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_2_lit.gif" border="0" alt="" /></a></p>
-<p>天气预报拍出来11区动作片</p>
-
-<p><a target="_blank" href="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_3.jpg" style="text-indent: 24px;"><img src="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_3_lit.jpg" border="0" alt="" /></a></p>
-<p>首师大宿管大妈：别以为我不知道你们在想什么</p>
-
-<p><a target="_blank" href="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_4.jpg" style="text-indent: 24px;"><img src="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_4_lit.jpg" border="0" alt="" /></a></p>
-<p>游戏审核那点事</p>
-
-<p><a target="_blank" href="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_5.gif" style="text-indent: 24px;"><img src="http://admin.3dmgame.com/uploads/allimg/161202/153_161202161325_5_lit.gif" border="0" alt="" /></a></p>
-<p>太坏了</p>
-
-<span style="display:none"></span><p><b style="color:#f00">更多精彩尽在 <a target="_blank" href="http://www.3dmgame.com/games/fivegod/" style="color:#f00">五</a>专题：</b><a target="_blank" href="http://www.3dmgame.com/games/fivegod/" class="">http://www.3dmgame.com/games/fivegod/</a>
-</p><div align="center" class="page_fenye">
+        sss = """<p>&nbsp;</p>
+<p>邪恶内涵图总是激情不断，最新爆笑囧图。给你不一样的周一风情!</p>
+<p align="center"><a target="_blank" href="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113829449.jpg"><img border="undefined" src="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113829449.jpg" alt="" /></a><br />
+连细菌都不吃的东西，网友们也别吃了</p>
+<p align="center"><a target="_blank" href="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113840370.jpg"><img border="undefined" src="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113840370.jpg" alt="" /></a><br />
+你第一个接吻的人不是她！是我！</p>
+<p align="center"><a target="_blank" href="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113847964.jpg"><img border="undefined" src="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113847964.jpg" alt="" /></a><br />
+求大神PS 把背景换成一个身临其境的感觉</p>
+<p align="center"><a target="_blank" href="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113853620.jpg"><img border="undefined" src="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113853620.jpg" alt="" /></a><br />
+真是好味道</p>
+<p align="center"><a target="_blank" href="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113902858.jpg"><img border="undefined" src="http://www.3dmgame.com/Article/UploadFiles/201302/20130225113902858.jpg" alt="" /></a><br />
+去掉头就可以</p>
+<div align="center" class="page_fenye">
 <div class="pagelistbox">
-<span>共 44 页/44条记录</span><span class="indexPage">首页 
-</span><strong>1</strong>
-<a target="_self"  href='3612345_2.html'>2</a>
-<a target="_self"  href='3612345_3.html'>3</a>
-<a target="_self"  href='3612345_4.html'>4</a>
-<a target="_self"  href='3612345_5.html'>5</a>
-<a target="_self"  href='3612345_6.html'>6</a>
-<a target="_self"  href='3612345_7.html'>7</a>
-<a target="_self"  href='3612345_8.html'>8</a>
-<a target="_self"  href='3612345_9.html'>9</a>
-<a target="_self"  href='3612345_10.html'>10</a>
-<a target="_self"  href='3612345_11.html'>11</a>
-<a  href='3612345_2.html'>下页</a> 
-<a  href='3612345_44.html'>末页</a> 
-</div>
-</div>"""
+<span>共 54 页/54条记录</span><span class="indexPage">首页 """
         test = Spider3dm('')
         ret = test.image_urls(sss)
         print ret

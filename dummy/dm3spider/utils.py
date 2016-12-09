@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-
+import gevent
 
 def dump(obj, filename):
     with open(filename, 'wb') as fd:
@@ -37,3 +37,16 @@ def auto_save_and_load(auto_update=True):
 
     return decorator
 
+
+def check_img_complete(img_name):
+    img = read_file(img_name)
+    if img_name.endswith('.jpg') or img_name.endswith('.JPG'):
+        if img.endswith('\xff\xd9'):
+            return True
+        else:
+            return False
+    elif img_name.endswith('.gif'):
+        if img.endswith('\x3b'):
+            return True
+        else:
+            return False
