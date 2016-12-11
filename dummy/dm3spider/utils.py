@@ -2,8 +2,6 @@
 import json
 import os
 import gevent
-import env
-import requests
 from gevent.queue import Queue
 from gevent.pool import Pool, Group
 from gevent.greenlet import Greenlet
@@ -93,30 +91,12 @@ class QueueConsumerPool(Pool):
         super(QueueConsumerPool, self).join(timeout=timeout, raise_error=raise_error)
 
 
-def get(url, params=None, **kwargs):
-    kwargs['headers'] = env.headers
-    if 'proxies' not in kwargs:
-        while True:
-            kwargs['proxies'] = env.proxy_manager.get_proxy()
-            try:
-                ret = requests.get(url, params=params, **kwargs)
-            except:
-                print 'get %s failed!' % url,
-                env.proxy_db.Put(json.dumps(kwargs['proxies']), 'bad')
-            else:
-                print 'get %s successed! ' % url
-                return ret
-    else:
-        return requests.get(url, params=params, **kwargs)
-
-
 if __name__ == '__main__':
     q = Queue()
-    p = QueueConsumerPool(4, QueueConsumer, q)
-
+    deams = Group()
     q.put_nowait('sdf')
     q.put_nowait('s2df')
-
     q.put_nowait('sd3f')
     q.put_nowait('s1df')
-    p.join()
+    deams.start(QueueConsumer(q))
+    deams.join()

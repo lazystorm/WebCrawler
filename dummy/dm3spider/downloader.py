@@ -3,6 +3,7 @@ import requests
 import env
 import gevent
 import os
+import proxy
 from gevent.pool import Pool
 from gevent.queue import Queue
 from utils import load, dump, QueueConsumer
@@ -34,7 +35,8 @@ class JoinImageDownloader:
                 download_pool.spawn(self.download_image, url, image_name)
 
     def download_image(self, url, image_name):
-        content = requests.get(url).content
+        #content = requests.get(url).content
+        content = proxy.get(url, use_proxy=True).content
         file_meta = {'dir_name': self.dir_name, 'content': content, 'image_name': image_name}
         image_file_metas.put_nowait(file_meta)
         print 'Finish download: %s' % image_name
