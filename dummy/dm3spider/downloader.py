@@ -5,7 +5,7 @@ import gevent
 import os
 from gevent.pool import Pool
 from gevent.queue import Queue
-from utils import load, dump
+from utils import load, dump, QueueConsumer
 from gevent import monkey
 
 image_file_metas = Queue()
@@ -30,7 +30,8 @@ class JoinImageDownloader:
         for url in self.image_urls:
             image_name = url[url.rfind(r'/') + 1:]
             if image_name not in self.downloaded_images:
-                self.download_image(url, image_name)
+                download_pool.wait_available()
+                download_pool.spawn(self.download_image, url, image_name)
 
     def download_image(self, url, image_name):
         content = requests.get(url).content
@@ -49,12 +50,10 @@ class DownloadManager:
 
     def download(self):
         dirs = [d for d in os.listdir('.') if os.path.isdir(d)]
-        join_image_downloaders = []
         for dir_ in dirs:
             downloaded_images = self.downloaded_images.get(dir_, [])
             join_image_downloader = JoinImageDownloader(dir_, downloaded_images)
-            join_image_downloaders.append(join_image_downloader)
-            download_pool.spawn(join_image_downloader.download)
+            join_image_downloader.download()
         download_pool.join()
 
     def finish(self):
@@ -62,6 +61,7 @@ class DownloadManager:
         gevent.joinall([self.file_writer])
         dump(self.downloaded_images, env.download_log_filename)
 
+    #TODO: using QueueConsumer
     class Writer:
         def __init__(self, downloaded_images):
             self.stop = False
@@ -85,7 +85,8 @@ class DownloadManager:
                         self.downloaded_images[dir_name] = [image_name]
                     else:
                         self.downloaded_images[dir_name].append(image_name)
-                    print 'downloaded_images in writer:', self.downloaded_images
+                    if image_file_metas.empty():
+                        dump(self.downloaded_images, env.download_log_filename)
                 else:
                     gevent.sleep(0.1)
             print 'Quitting writer!'
@@ -98,10 +99,9 @@ def main():
     try:
         downloader.download()
     except KeyboardInterrupt:
-        print("exception")
+        pass
     finally:
         downloader.finish()
-        print("finally")
 
 if __name__ == '__main__':
     main()

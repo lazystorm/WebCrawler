@@ -92,12 +92,8 @@ class Spider3dm:
             filename = self.dirname + '/' + url[url.rfind(r'/') + 1:]
             if not os.path.exists(filename):
                 #threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
-                while True:
-                    if download_pool.full():
-                        gevent.sleep(1)
-                    else:
-                        download_pool.spawn(Spider3dm.download_image, url, filename)
-                        break
+                download_pool.wait_available()
+                download_pool.spawn(Spider3dm.download_image, url, filename)
                 #gevent.sleep(1)
 
     @staticmethod
@@ -160,17 +156,7 @@ def download_missing_imgs():
             filename = url[url.rfind(r'/') + 1:]
             Spider3dm.download_image(url, filename)
         os.chdir('..')
-        """
-        if len(threads) < 40:
-            threads.append(gevent.spawn(Spider3dm.download_image, url, filename))
-        else:
-            gevent.joinall(threads, timeout=100)
-            tthrs = []
-            for thr in threads:
-                if not thr.successful():
-                    tthrs.append(thr)
-            threads = tthrs
-            print 'no of downloading threads %d' % len(threads)"""
+
 
 def main():
     fix = False
@@ -181,12 +167,10 @@ def main():
         print os.getcwd()
         urls = get_join_pic_urls(root_url, filename='join_pic_urls.py')
         r = []
-        #j = [gevent.spawn(joiner, 10)]
-        urls.reverse()
         for url in urls:
             r.append(Spider3dm(url))
             r[-1].download()
-        #gevent.joinall(j)
+        download_pool.join()
 
 
 if __name__ == '__main__':

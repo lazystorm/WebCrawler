@@ -33,12 +33,15 @@ def check_images(filename):
                 lf.readline()
                 logs = json.load(lf, encoding='utf-8')
             img_should_download = dict([[str(url[url.rfind('/') + 1:]), url] for url in logs['imgs']])
-            #print img_should_download
             img_downloaded = set([f for f in os.listdir('.') if not f.endswith('.py') and os.path.isfile(f)])
-            #print img_downloaded
+            for img in img_downloaded:
+                if not check_img_complete(img):
+                    print img
+                    missing_imgs.append([fr, img_should_download.get(img, None)])
             for img in img_should_download:
-                if img not in img_downloaded or not check_img_complete(img):
-                    missing_imgs.append([fr, img_should_download[img]])
+                if img not in img_downloaded:
+                    print img
+                    missing_imgs.append([fr, img_should_download.get(img, None)])
         os.chdir('..')
     return missing_imgs
 
