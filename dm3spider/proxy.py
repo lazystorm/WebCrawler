@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-import gevent
-import env
 import json
 import random
-import utils
+
+import gevent
 import requests
 from gevent.pool import Group
 from gevent.queue import Queue
 from gevent.greenlet import Greenlet
 from gevent import monkey
+
+import env
 from utils import QueueConsumer, QueueConsumerPool
 
 proxy_tobe_verified_metas = Queue()
@@ -23,7 +24,7 @@ class ProxyHunter(Greenlet):
         self.get_all_proxies()
 
     def get_all_proxies(self):
-        pass
+        raise NotImplementedError
 
 
 class KuaiDaiLi(ProxyHunter):
@@ -191,6 +192,7 @@ class ProxyManager(Greenlet):
                 proxy_tobe_verified_metas.put_nowait(meta)
             gevent.sleep(3600)
 
+    # TODO: use cache to manage proxies
     def get_proxy(self):
         if len(self.proxies) > 0:
             proxy = random.choice(self.proxies)

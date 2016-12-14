@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-import requests
-import env
-import gevent
 import os
-import proxy
+
+import gevent
 from gevent.pool import Pool
 from gevent.queue import Queue
-from utils import load, dump, QueueConsumer
 from gevent import monkey
+
+import env
+import proxy
+from utils import load, dump
 
 image_file_metas = Queue()
 download_pool = Pool(env.download_pool_size)
@@ -35,7 +36,7 @@ class JoinImageDownloader:
                 download_pool.spawn(self.download_image, url, image_name)
 
     def download_image(self, url, image_name):
-        #content = requests.get(url).content
+        # content = requests.get(url).content
         content = proxy.get(url, use_proxy=True).content
         file_meta = {'dir_name': self.dir_name, 'content': content, 'image_name': image_name}
         image_file_metas.put_nowait(file_meta)
@@ -63,7 +64,7 @@ class DownloadManager:
         gevent.joinall([self.file_writer])
         dump(self.downloaded_images, env.download_log_filename)
 
-    #TODO: using QueueConsumer
+    # TODO: using QueueConsumer
     class Writer:
         def __init__(self, downloaded_images):
             self.stop = False

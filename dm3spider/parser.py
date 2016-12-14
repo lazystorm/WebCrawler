@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-import requests
-import env
-import gevent
 import os
+import requests
 from gevent.pool import Pool
-from utils import auto_save_and_load
 from gevent import monkey
+
+import env
+from utils import auto_save_and_load
 
 
 class JoinPageParser:

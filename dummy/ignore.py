@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from Utils import auto_save_and_load
 import os
+
+from dm3spider.utils import auto_save_and_load
 
 
 @auto_save_and_load()

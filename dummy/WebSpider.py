@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
-import requests
 import re
-import gevent
 import os
-import Utils
-from ignore import ignore_dir
-from check import check_images
+
+import requests
+
+import gevent
 from gevent import monkey
 from gevent.pool import Pool
+
+import dm3spider.utils as Utils
+from ignore import ignore_dir
+from dm3spider.check import check_images
 
 monkey.patch_all()
 os.chdir('../images')

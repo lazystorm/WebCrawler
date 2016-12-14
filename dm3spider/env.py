@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 import leveldb
-import requests
+
 from proxy import ProxyManager
 
 #dirs
